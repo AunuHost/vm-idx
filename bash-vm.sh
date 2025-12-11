@@ -2,14 +2,9 @@
 set -euo pipefail
 
 ### Konfigurasi dasar
-BASE_DIR="/var/lib/local-vms"
-
-# Cek user root
-if [ "$(id -u)" -ne 0 ]; then
-  echo "Harus dijalankan sebagai root. Contoh:"
-  echo "  sudo bash $0"
-  exit 1
-fi
+# Bisa di-override dari environment, contoh:
+#   BASE_DIR=/mnt/vms bash bash-vm.sh
+BASE_DIR="${BASE_DIR:-$HOME/local-vms}"
 
 # Cek dependency minimal
 NEEDED_CMDS=(qemu-system-x86_64 qemu-img wget)
@@ -73,6 +68,9 @@ VCPUS="${VCPUS:-2}"
 
 echo
 echo "=== Konfigurasi KVM ==="
+QEMU_ACCEL=""
+KVM_STATUS=""
+
 if [ -e /dev/kvm ] && [ -r /dev/kvm ]; then
   echo "/dev/kvm terdeteksi."
   read -rp "Aktifkan akselerasi KVM? (Y/n) [Y]: " KVM_CHOICE
@@ -97,7 +95,7 @@ DISK_FILE="${VM_DIR}/${VM_NAME}.qcow2"
 echo
 echo "=== Ringkasan konfigurasi VM ==="
 echo "Nama VM (QEMU) : $VM_NAME"
-echo "Hostname OS    : ${GUEST_HOSTNAME:-<isi sendiri di installer / nanti>}"
+echo "Hostname OS    : ${GUEST_HOSTNAME:-<isi di installer / nanti>}"
 echo "Direktori      : $VM_DIR"
 echo "Disk           : ${DISK_SIZE}G (${DISK_FILE})"
 echo "RAM            : ${RAM_MB} MB"
@@ -109,7 +107,7 @@ echo
 mkdir -p "$VM_DIR"
 
 # Simpan hostname yang diinginkan sebagai catatan
-echo "$GUEST_HOSTNAME" > "${VM_DIR}/desired-hostname.txt"
+echo "${GUEST_HOSTNAME:-}" > "${VM_DIR}/desired-hostname.txt"
 
 # Download ISO kalau belum ada
 if [ -f "$ISO_FILE" ]; then
@@ -134,6 +132,7 @@ START_SCRIPT="${VM_DIR}/start-${VM_NAME}.sh"
 cat > "$START_SCRIPT" << EOF
 #!/usr/bin/env bash
 set -euo pipefail
+
 cd "$VM_DIR"
 
 exec qemu-system-x86_64 \\
@@ -151,9 +150,8 @@ chmod +x "$START_SCRIPT"
 
 echo "Script start VM dibuat: $START_SCRIPT"
 echo "Nanti setelah instalasi selesai & ISO tidak dibutuhkan, jalankan:"
-echo "  sudo $START_SCRIPT"
+echo "  $START_SCRIPT"
 echo
-
 echo "=== Menjalankan VM untuk instalasi (boot dari ISO) ==="
 echo "Untuk keluar dari QEMU (display curses):"
 echo "  Tekan:  Ctrl + A  lalu X"
